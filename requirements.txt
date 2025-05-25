@@ -10,3 +10,4 @@ bitsandbytes
 datasets
 trl
 safetensors
+llama-cpp-python
