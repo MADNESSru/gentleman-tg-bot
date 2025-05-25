@@ -15,6 +15,7 @@ from telegram.ext import (
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 import os
+from llama_cpp import Llama
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY")
@@ -47,12 +48,14 @@ Never say you are an AI, assistant, model, or artificial intelligence. Never bre
 """
 
 # --- Загрузка модели (на старте бота) ---
-tokenizer = AutoTokenizer.from_pretrained("lenML/aya-expanse-8b-abliterated")
+tokenizer = AutoTokenizer.from_pretrained("TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF")
+
 model = AutoModelForCausalLM.from_pretrained(
-    "lenML/aya-expanse-8b-abliterated",
+    "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF",
     torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
     device_map="auto"
 )
+
 model.eval()
 
 # --- Команды ---
