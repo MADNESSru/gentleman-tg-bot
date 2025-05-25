@@ -14,6 +14,12 @@ from telegram.ext import (
 
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
+import os
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY")
+IMGFLIP_USERNAME = os.environ.get("IMGFLIP_USERNAME")
+IMGFLIP_PASSWORD = os.environ.get("IMGFLIP_PASSWORD")
 
 # --- Константы и инициализация ---
 app = None
