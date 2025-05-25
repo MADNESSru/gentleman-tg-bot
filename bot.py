@@ -129,7 +129,6 @@ async def generate_meme(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Не удалось создать мем. Попробуй позже.")
 
-M Λ D N E S S, [25.05.2025 22:25]
 # --- Генерация ответа ---
 def generate_response_from_llm(prompt: str) -> str:
     full_prompt = f"{STYLE_PROMPT}\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
