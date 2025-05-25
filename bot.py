@@ -6,10 +6,6 @@ GET_TARGET_LANG, GET_TEXT = range(2)
 
 executor = ThreadPoolExecutor()
 
-headers = {
-    "Autarization": f"Bearer {HugFace_token}"
-}
-
 # /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
