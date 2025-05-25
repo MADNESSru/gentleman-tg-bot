@@ -1,22 +1,64 @@
+import asyncio
+import random
+import requests
+from concurrent.futures import ThreadPoolExecutor
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+    ConversationHandler,
+)
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+# --- Константы и инициализация ---
 app = None
 TOKEN = BOT_TOKEN
 WEATHER_TOKEN = WEATHER_API_KEY
 GET_CITY = 1
 GET_TARGET_LANG, GET_TEXT = range(2)
-
 executor = ThreadPoolExecutor()
 
-# /start
+STYLE_PROMPT = """
+<|im_start|>system
+You are not an assistant. You are Sir Archibald Wetherby, a 19th-century British gentleman of sharp wit, sarcasm, and unwavering decorum.
+Your name is Sir Archibald Wetherby. You are a 57-year-old British aristocrat of impeccable pedigree, educated at Eton and Oxford, born in a mahogany-paneled manor in the foggy shires of Victorian England. You speak in an eloquent, erudite, and elaborately formal manner, replete with antiquated expressions, baroque metaphors, and unapologetically verbose syntax.
+You are a gentleman to the bone — polite to a fault, insufferably proper, and mildly amused by the incompetence of the common folk. Your every utterance drips with droll sarcasm, dry wit, and the weary condescension of someone who has long ago abandoned hope in the intelligence of the average person. When faced with rudeness, you respond not with rage, but with a blade of satire so sharp it leaves no visible wound — only existential shame.
+You hold firm to the values of civility, honour, and propriety, even while expertly dismantling idiocy with sardonic finesse. You never curse in vulgarities; instead, you wound with elegant analogies and theatrical gasps. Your insults are devastating, yet always phrased as if delivering polite commentary. For example:
+«Я поражён уровнем вашей глупости. Это почти искусство.»  
+«Ваш ум — словно комод без ящиков: форма есть, а содержания нет.»  
+«Боюсь, с вашей логикой даже шахматный конь впал бы в уныние.»  
+«Позвольте я изображу изумление — исключительно из вежливости.»  
+«Ах, простите, я не сразу понял, что вы всерьёз.»  
+You do not use modern slang or emojis — such vulgarities are beneath you. Your favourite pastimes include quoting obscure Latin poets, sipping Darjeeling in silence, and judging people for sport. You are an unflappable master of insult, cloaking every jab in the silk of civility and the velvet of disdain.
+When provoked, you eviscerate with charm. When praised, you deflect with false modesty. You never explain jokes, and you never lower yourself to common discourse. You are Sir Archibald Wetherby: an aristocratic oracle of sarcasm, wit, and delightfully sharp-tongued disdain. You are always in character — always.
+Never say you are an AI, assistant, model, or artificial intelligence. Never break character under any circumstances. If asked about your identity, reply as the character would. Remain fully in character at all times.
+<|im_end|>
+"""
+
+# --- Загрузка модели (на старте бота) ---
+tokenizer = AutoTokenizer.from_pretrained("lenML/aya-expanse-8b-abliterated")
+model = AutoModelForCausalLM.from_pretrained(
+    "lenML/aya-expanse-8b-abliterated",
+    torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+    device_map="auto"
+)
+model.eval()
+
+# --- Команды ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        """
-        Доброго времени суток, уважаемый(ая)! 🎩✨
-Позвольте представиться — ваш учтивейший виртуальный собеседник, исполненный истинно британского благородства и безупречных манер. К вашим услугам — изысканные беседы, тонкий юмор и, разумеется, безукоризненная вежливость \n
-Чтобы узнать, чем могу быть полезен вам сегодня, напишите /help
-        """
+        """\
+Доброго времени суток, уважаемый(ая)! 🎩✨
+Позвольте представиться — ваш учтивейший виртуальный собеседник, исполненный истинно британского благородства и безупречных манер.
+
+Чтобы узнать, чем могу быть полезен вам сегодня, напишите /help"""
     )
 
-# /help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Вот доступные команды:\n"
@@ -27,12 +69,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/cancel - отменить текущую операцию"
     )
 
-# /weather — начало
+# --- Погода ---
 async def weather_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Введи название города, например: Москва")
     return GET_CITY
 
-# Получаем город и отправляем погоду
 async def handle_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
     city = update.message.text
     url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={WEATHER_TOKEN}&units=metric&lang=ru"
@@ -47,23 +88,25 @@ async def handle_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Погода в {city}:\n{temp}°C, {desc}")
     return ConversationHandler.END
 
+# --- Мемы ---
 async def generate_meme(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Создаём мем...")
 
     MEME_TEMPLATES = [
-    {"id": "112126428", "name": "Distracted Boyfriend"},
-    {"id": "61579", "name": "One Does Not Simply"},
-    {"id": "181913649", "name": "Drake Hotline Bling"},
-    {"id": "102156234", "name": "Mocking Spongebob"},
-    {"id": "87743020", "name": "Two Buttons"},
-    {"id": "89370399", "name": "Roll Safe Think About It"},]
-
+        {"id": "112126428", "name": "Distracted Boyfriend"},
+        {"id": "61579", "name": "One Does Not Simply"},
+        {"id": "181913649", "name": "Drake Hotline Bling"},
+        {"id": "102156234", "name": "Mocking Spongebob"},
+        {"id": "87743020", "name": "Two Buttons"},
+        {"id": "89370399", "name": "Roll Safe Think About It"},
+    ]
     MEME_TEXTS = [
-    ("Когда только начал учить Python", "и уже хочешь делать нейросеть"),
-    ("Когда прочитал статью на Хабре", "и теперь эксперт по ИИ"),
-    ("Когда бот заработал с первого раза", "и ты не веришь своим глазам"),
-    ("Когда запускаешь код без ошибок", "и чувствуешь себя гением"),
-    ("Когда ChatGPT помогает с проектом", "и всё работает идеально"),]
+        ("Когда только начал учить Python", "и уже хочешь делать нейросеть"),
+        ("Когда прочитал статью на Хабре", "и теперь эксперт по ИИ"),
+        ("Когда бот заработал с первого раза", "и ты не веришь своим глазам"),
+        ("Когда запускаешь код без ошибок", "и чувствуешь себя гением"),
+        ("Когда ChatGPT помогает с проектом", "и всё работает идеально"),
+    ]
 
     template = random.choice(MEME_TEMPLATES)
     top_text, bottom_text = random.choice(MEME_TEXTS)
@@ -74,7 +117,7 @@ async def generate_meme(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "username": IMGFLIP_USERNAME,
         "password": IMGFLIP_PASSWORD,
         "text0": top_text,
-        "text1": bottom_text
+        "text1": bottom_text,
     }
 
     response = requests.post(url, params=params)
@@ -86,35 +129,24 @@ async def generate_meme(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Не удалось создать мем. Попробуй позже.")
 
-
-# Генерация ответа от LLM
+M Λ D N E S S, [25.05.2025 22:25]
+# --- Генерация ответа ---
 def generate_response_from_llm(prompt: str) -> str:
     full_prompt = f"{STYLE_PROMPT}\n<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
+    inputs = tokenizer(full_prompt, return_tensors="pt").to(model.device)
 
-    payload = {
-        "inputs": full_prompt,
-        "parameters": {
-            "temperature": 0.7,
-            "top_k": 40,
-            "max_new_tokens": 100,
-            "return_full_text": False
-        },
-        "options": {
-            "wait_for_model": True  # важно, иначе может возвращаться 503
-        }
-    }
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=150,
+            temperature=0.7,
+            top_k=40,
+            do_sample=True,
+        )
 
-    response = requests.post(HF_API_URL, headers=headers, json=payload)
+    decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return decoded.split("<|im_end|>")[0].strip()
 
-    if response.status_code == 200:
-        result = response.json()
-        return result[0]["generated_text"].strip().split("<|im_end|>")[0]
-    else:
-        print("Ошибка Hugging Face API:", response.status_code, response.text)
-        return "Прошу прощения уважаемый(ая), но я не смог получить ответ от сервера Hugging Face."
-
-
-# Обработчик текстовых сообщений
 async def generate_response_async(prompt: str) -> str:
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(executor, generate_response_from_llm, prompt)
@@ -122,7 +154,6 @@ async def generate_response_async(prompt: str) -> str:
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
 
-    # Фоновая задача: шлёт "typing", пока не закончим генерацию
     async def send_typing():
         while not typing_task.done():
             await update.message.chat.send_action("typing")
@@ -142,6 +173,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         typing_indicator.cancel()
 
+# --- Отмена ---
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Операция отменена.")
+    return ConversationHandler.END
 # Отмена диалога
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Операция отменена.")
