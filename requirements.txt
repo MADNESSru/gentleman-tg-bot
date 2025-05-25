@@ -1,0 +1,12 @@
+dotenv
+telegram
+python-telegram-bot
+requests
+aiogram
+transformers
+accelerate
+peft
+bitsandbytes
+datasets
+trl
+safetensors
